@@ -21,7 +21,8 @@
 
 @property (nonatomic, assign) BOOL gestureEnabled;
 @property (nonatomic, assign) BOOL hideWhenTap;
-@property (nonatomic, assign) CGFloat gestureDetectWidth;
+@property (nonatomic, assign) CGFloat gestureDetectTop;
+@property (nonatomic, assign) CGSize gestureDetectSize;
 
 @property (nonatomic, weak) id <MVRightSlideViewDelegate> delegate;
 
@@ -36,11 +37,11 @@
 @protocol MVRightSlideViewDelegate <NSObject>
 
 @optional
-- (BOOL)shouldShowRightSlideView:(MVRightSlideView *)rightSlideView;
+- (BOOL)rightSlideView:(MVRightSlideView *)rightSlideView shouldReceiveGestureRecognizer:(UIGestureRecognizer *)gestureRecognizer;
+
 - (void)willShowRightSlideView:(MVRightSlideView *)rightSlideView;
 - (void)didShowRightSlideView:(MVRightSlideView *)rightSlideView;
 
-- (BOOL)shouldHideRightSlideView:(MVRightSlideView *)rightSlideView;
 - (void)willHideRightSlideView:(MVRightSlideView *)rightSlideView;
 - (void)didHideRightSlideView:(MVRightSlideView *)rightSlideView;
 

@@ -74,7 +74,8 @@
 
 - (void)setupDefaults
 {
-    _gestureDetectWidth = 44.f;
+    _gestureDetectTop = 0.f;
+    _gestureDetectSize = CGSizeMake(44.f, CGRectGetHeight(_userRootView.frame));
     _animationSpeed = 0.5;
     _hideWhenTap = YES;
     _showing = NO;
@@ -87,6 +88,7 @@
     _rootMaskView.alpha = 0.f;
     _rootMaskView.frame = self.bounds;
     _rootMaskView.hidden = YES;
+    _rootMaskView.frame = [[UIApplication sharedApplication] keyWindow].bounds;
     [self addSubview:_rootMaskView];
     
     _realRightView = [[RealRightView alloc] init];
@@ -115,7 +117,7 @@
     
     self.clipsToBounds = YES;
     [super setBackgroundColor:[UIColor clearColor]];
-    [self resetCurrentRootView];
+    [self setCurrentRootView:_userRootView];
     
     self.gestureEnabled = NO;
     
@@ -165,14 +167,14 @@
 
 #pragma mark - UIGestureRecognizers
 
-- (void)tapGesture:(UITapGestureRecognizer *)gesture
+- (void)tapGesture:(UITapGestureRecognizer *)gestureRecognizer
 {
     if (!_hideWhenTap)
     {
         return;
     }
     
-    if (_delegate && [_delegate respondsToSelector:@selector(shouldHideRightSlideView:)] && ![_delegate shouldHideRightSlideView:self])
+    if (_delegate && [_delegate respondsToSelector:@selector(rightSlideView:shouldReceiveGestureRecognizer:)] && ![_delegate rightSlideView:self shouldReceiveGestureRecognizer:gestureRecognizer])
     {
         return;
     }
@@ -182,7 +184,7 @@
 
 - (void)panGesture:(UIPanGestureRecognizer *)gestureRecognizer
 {
-    if (_delegate && [_delegate respondsToSelector:@selector(shouldShowRightSlideView:)] && ![_delegate shouldShowRightSlideView:self])
+    if (_delegate && [_delegate respondsToSelector:@selector(rightSlideView:shouldReceiveGestureRecognizer:)] && ![_delegate rightSlideView:self shouldReceiveGestureRecognizer:gestureRecognizer])
     {
         return;
     }
@@ -199,8 +201,8 @@
             CGFloat interactiveX = (_showing ? size.width - _rightViewSize.width : size.width);
             BOOL velocityDone = (_showing ? velocity.x > 0.f : velocity.x < 0.f);
             
-            CGFloat shiftLeft = (_showing ? _gestureDetectWidth / 2.f : _gestureDetectWidth);
-            CGFloat shiftRight = _gestureDetectWidth;
+            CGFloat shiftLeft = (_showing ? _gestureDetectSize.width / 2.f : _gestureDetectSize.width);
+            CGFloat shiftRight = _gestureDetectSize.width;
             
             BOOL needProcess = NO;
             if (_showing)
@@ -214,7 +216,7 @@
                     needProcess = YES;
                 }
             }
-            else if (location.x >= interactiveX - shiftLeft && location.x <= interactiveX + shiftRight)
+            else if (location.x >= interactiveX - shiftLeft && location.x <= interactiveX + shiftRight && location.y >= _gestureDetectTop && location.y <= _gestureDetectTop + _gestureDetectSize.height)
             {
                 needProcess = YES;
             }
@@ -226,20 +228,9 @@
                 
                 if (!_showing)
                 {
-                    UIWindow *window = [[UIApplication sharedApplication] keyWindow];
+                    [self setCurrentRootView:[[UIApplication sharedApplication] keyWindow]];
                     
-                    _rootMaskView.frame = window.bounds;
-                    _rightViewTop = [self convertPoint:CGPointMake(0.f, _rightViewTop) toView:window].y;
-                    if (_rightViewGestureStartX)
-                    {
-                        _rightViewGestureStartX = [NSNumber numberWithDouble:[self convertPoint:CGPointMake(_rightViewGestureStartX.doubleValue, 0.f) toView:window].x];
-                    }
-                    
-                    [super setFrame:window.bounds];
                     [self showRightViewPrepare];
-                    
-                    [window addSubview:self];
-                    _currentRootView = window;
                 }
             }
         }
@@ -467,7 +458,7 @@
                                _rightMaskView.hidden = YES;
                                _realRightView.hidden = YES;
                                
-                               [self resetCurrentRootView];
+                               [self setCurrentRootView:_userRootView];
                            });
         }
         else
@@ -476,7 +467,7 @@
             _rightMaskView.hidden = YES;
             _realRightView.hidden = YES;
             
-            [self resetCurrentRootView];
+            [self setCurrentRootView:_userRootView];
         }
     }
     else
@@ -487,24 +478,39 @@
     }
 }
 
-- (void)resetCurrentRootView
+- (void)setCurrentRootView:(UIView *)currentRootView
 {
-    if (_currentRootView != _userRootView)
+    if (_currentRootView != currentRootView)
     {
-        [super setFrame:CGRectMake(CGRectGetWidth(_userRootView.bounds) - _gestureDetectWidth, 0.f, _gestureDetectWidth, CGRectGetHeight(_userRootView.bounds))];
-        [_userRootView addSubview:self];
-        
         UIWindow *window = [[UIApplication sharedApplication] keyWindow];
-        if (_currentRootView == window)
+        
+        if (currentRootView == _userRootView)
         {
-            _rightViewTop = [window convertPoint:CGPointMake(0.f, _rightViewTop) toView:self].y;
-            if (_rightViewGestureStartX)
+            [super setFrame:CGRectMake(0.f, 0.f, CGRectGetWidth(_userRootView.frame), CGRectGetHeight(_userRootView.bounds))];
+            [_userRootView addSubview:self];
+            [_userRootView sendSubviewToBack:self];
+            
+            if (_currentRootView == window)
             {
-                _rightViewGestureStartX = [NSNumber numberWithDouble:[window convertPoint:CGPointMake(_rightViewGestureStartX.doubleValue, 0.f) toView:self].x];
+                _rightViewTop = [window convertPoint:CGPointMake(0.f, _rightViewTop) toView:self].y;
+                _gestureDetectTop = [window convertPoint:CGPointMake(0.f, _gestureDetectTop) toView:self].y;
+            }
+            
+            _currentRootView = currentRootView;
+        }
+        else if (currentRootView == window)
+        {
+            if (_currentRootView == _userRootView)
+            {
+                _rightViewTop = [self convertPoint:CGPointMake(0.f, _rightViewTop) toView:window].y;
+                _gestureDetectTop = [self convertPoint:CGPointMake(0.f, _gestureDetectTop) toView:window].y;
+                
+                [super setFrame:window.bounds];
+                [window addSubview:self];
+                
+                _currentRootView = currentRootView;
             }
         }
-        
-        _currentRootView = _userRootView;
     }
 }
 
