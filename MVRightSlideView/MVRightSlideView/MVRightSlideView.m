@@ -74,8 +74,7 @@
 
 - (void)setupDefaults
 {
-    _gestureDetectTop = 0.f;
-    _gestureDetectSize = CGSizeMake(44.f, CGRectGetHeight(_userRootView.frame));
+    _hotArea = CGRectMake(CGRectGetWidth(_userRootView.frame) - 44.f, 0.f, 44.f, CGRectGetHeight(_userRootView.frame));
     _animationSpeed = 0.5;
     _hideWhenTap = YES;
     _showing = NO;
@@ -119,7 +118,7 @@
     [super setBackgroundColor:[UIColor clearColor]];
     [self setCurrentRootView:_userRootView];
     
-    self.gestureEnabled = NO;
+    self.enabled = YES;
     
     [self resetLayouts];
 }
@@ -129,10 +128,12 @@
     return _realRightView;
 }
 
-- (void)setGestureEnabled:(BOOL)gestureEnabled
+- (void)setEnabled:(BOOL)enabled
 {
-    _tapGesture.enabled = gestureEnabled;
-    _panGesture.enabled = gestureEnabled;
+    _enabled = enabled;
+    
+    _tapGesture.enabled = enabled;
+    _panGesture.enabled = enabled;
 }
 
 - (void)showRightViewAnimated:(BOOL)animated completionHandler:(void(^)())completionHandler
@@ -201,8 +202,9 @@
             CGFloat interactiveX = (_showing ? size.width - _rightViewSize.width : size.width);
             BOOL velocityDone = (_showing ? velocity.x > 0.f : velocity.x < 0.f);
             
-            CGFloat shiftLeft = (_showing ? _gestureDetectSize.width / 2.f : _gestureDetectSize.width);
-            CGFloat shiftRight = _gestureDetectSize.width;
+            CGFloat width = CGRectGetWidth(_hotArea);
+            CGFloat shiftLeft = (_showing? width / 2.f :  width);
+            CGFloat shiftRight = width;
             
             BOOL needProcess = NO;
             if (_showing)
@@ -216,7 +218,7 @@
                     needProcess = YES;
                 }
             }
-            else if (location.x >= interactiveX - shiftLeft && location.x <= interactiveX + shiftRight && location.y >= _gestureDetectTop && location.y <= _gestureDetectTop + _gestureDetectSize.height)
+            else if (location.x >= interactiveX - shiftLeft && location.x <= interactiveX + shiftRight && location.y >= CGRectGetMinY(_hotArea) && location.y <= CGRectGetMaxY(_hotArea))
             {
                 needProcess = YES;
             }
@@ -493,7 +495,6 @@
             if (_currentRootView == window)
             {
                 _rightViewTop = [window convertPoint:CGPointMake(0.f, _rightViewTop) toView:self].y;
-                _gestureDetectTop = [window convertPoint:CGPointMake(0.f, _gestureDetectTop) toView:self].y;
             }
             
             _currentRootView = currentRootView;
@@ -503,7 +504,6 @@
             if (_currentRootView == _userRootView)
             {
                 _rightViewTop = [self convertPoint:CGPointMake(0.f, _rightViewTop) toView:window].y;
-                _gestureDetectTop = [self convertPoint:CGPointMake(0.f, _gestureDetectTop) toView:window].y;
                 
                 [super setFrame:window.bounds];
                 [window addSubview:self];

@@ -19,10 +19,9 @@
 @property (nonatomic, strong) UIColor *rightMaskColor;
 @property (nonatomic, assign) NSTimeInterval animationSpeed;
 
-@property (nonatomic, assign) BOOL gestureEnabled;
+@property (nonatomic, assign) BOOL enabled;
 @property (nonatomic, assign) BOOL hideWhenTap;
-@property (nonatomic, assign) CGFloat gestureDetectTop;
-@property (nonatomic, assign) CGSize gestureDetectSize;
+@property (nonatomic, assign) CGRect hotArea;
 
 @property (nonatomic, weak) id <MVRightSlideViewDelegate> delegate;
 
