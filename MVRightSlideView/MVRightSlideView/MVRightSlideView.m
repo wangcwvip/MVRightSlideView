@@ -37,7 +37,7 @@
 
 @interface MVRightSlideView () <UIGestureRecognizerDelegate>
 
-@property (nonatomic, weak) UIView *userRootView;
+@property (nonatomic, weak) UIView *rootView;
 @property (nonatomic, weak) UIView *currentRootView;
 @property (nonatomic, strong) RealRightView *realRightView;
 @property (nonatomic, assign) CGFloat rightViewTop;
@@ -50,8 +50,8 @@
 
 @property (strong, nonatomic) NSNumber *rightViewGestureStartX;
 @property (assign, nonatomic) BOOL rightViewShowingBeforeGesture;
-
-@property (nonatomic, assign) CGSize keepSize;
+@property (nonatomic, assign) BOOL shouldReceiveTapGestureRecognizer;
+@property (nonatomic, assign) BOOL shouldReceivePanGestureRecognizer;
 
 @end
 
@@ -62,7 +62,7 @@
 {
     if (self = [super init])
     {
-        _userRootView = rootView;
+        _rootView = rootView;
         _rightViewTop = rightViewTop;
         _rightViewSize = rightViewSize;
         
@@ -74,10 +74,17 @@
 
 - (void)setupDefaults
 {
-    _hotArea = CGRectMake(CGRectGetWidth(_userRootView.frame) - 44.f, 0.f, 44.f, CGRectGetHeight(_userRootView.frame));
-    _animationSpeed = 0.5;
+    if (_rootView == nil)
+    {
+        _rootView = [[UIApplication sharedApplication] keyWindow];
+    }
+    
     _hideWhenTap = YES;
-    _showing = NO;
+    _isShowing = NO;
+    _hotArea = CGRectMake(CGRectGetWidth(_rootView.frame) - 44.f, 0.f, 44.f, CGRectGetHeight(_rootView.frame));
+    _animationDuration = 0.5;
+    _shouldReceivePanGestureRecognizer = YES;
+    _shouldReceiveTapGestureRecognizer = YES;
     
     _maskColor = [UIColor colorWithWhite:0.f alpha:0.5];
     _rightMaskColor = _maskColor;
@@ -105,18 +112,18 @@
     _tapGesture.numberOfTapsRequired = 1;
     _tapGesture.numberOfTouchesRequired = 1;
     _tapGesture.cancelsTouchesInView = NO;
-    [self addGestureRecognizer:_tapGesture];
+    [_rootMaskView addGestureRecognizer:_tapGesture];
     
     _panGesture = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panGesture:)];
     _panGesture.delegate = self;
     _panGesture.minimumNumberOfTouches = 1;
     _panGesture.maximumNumberOfTouches = 1;
     _panGesture.cancelsTouchesInView = YES;
-    [self addGestureRecognizer:_panGesture];
+    [_rootView addGestureRecognizer:_panGesture];
     
     self.clipsToBounds = YES;
     [super setBackgroundColor:[UIColor clearColor]];
-    [self setCurrentRootView:_userRootView];
+    [self setCurrentRootView:_rootView];
     
     self.enabled = YES;
     
@@ -138,7 +145,7 @@
 
 - (void)showRightViewAnimated:(BOOL)animated completionHandler:(void(^)())completionHandler
 {
-    if (!_showing)
+    if (!_isShowing)
     {
         [self showRightViewPrepare];
         
@@ -148,7 +155,7 @@
 
 - (void)hideRightViewAnimated:(BOOL)animated completionHandler:(void(^)())completionHandler
 {
-    if (_showing)
+    if (_isShowing)
     {
         [self hideRightViewAnimated:animated fromPercentage:1.f completionHandler:completionHandler];
     }
@@ -156,7 +163,7 @@
 
 - (void)showHideRightViewAnimated:(BOOL)animated completionHandler:(void (^)())completionHandler
 {
-    if (_showing)
+    if (_isShowing)
     {
         [self hideRightViewAnimated:animated completionHandler:completionHandler];
     }
@@ -175,17 +182,27 @@
         return;
     }
     
-    if (_delegate && [_delegate respondsToSelector:@selector(rightSlideView:shouldReceiveGestureRecognizer:)] && ![_delegate rightSlideView:self shouldReceiveGestureRecognizer:gestureRecognizer])
+    if (gestureRecognizer.state == UIGestureRecognizerStateBegan)
+    {
+        _shouldReceiveTapGestureRecognizer = [self shouldReceiveGestureRecognizer:gestureRecognizer];
+    }
+    if (!_shouldReceiveTapGestureRecognizer)
     {
         return;
     }
+    
+    [self shouldReceiveGestureRecognizer:gestureRecognizer];
     
     [self hideRightViewAnimated:YES completionHandler:nil];
 }
 
 - (void)panGesture:(UIPanGestureRecognizer *)gestureRecognizer
 {
-    if (_delegate && [_delegate respondsToSelector:@selector(rightSlideView:shouldReceiveGestureRecognizer:)] && ![_delegate rightSlideView:self shouldReceiveGestureRecognizer:gestureRecognizer])
+    if (gestureRecognizer.state == UIGestureRecognizerStateBegan)
+    {
+        _shouldReceivePanGestureRecognizer = [self shouldReceiveGestureRecognizer:gestureRecognizer];
+    }
+    if (!_shouldReceivePanGestureRecognizer)
     {
         return;
     }
@@ -199,15 +216,15 @@
     {
         if (!_rightViewGestureStartX && (gestureRecognizer.state == UIGestureRecognizerStateBegan || gestureRecognizer.state == UIGestureRecognizerStateChanged))
         {
-            CGFloat interactiveX = (_showing ? size.width - _rightViewSize.width : size.width);
-            BOOL velocityDone = (_showing ? velocity.x > 0.f : velocity.x < 0.f);
+            CGFloat interactiveX = (_isShowing ? size.width - _rightViewSize.width : size.width);
+            BOOL velocityDone = (_isShowing ? velocity.x > 0.f : velocity.x < 0.f);
             
             CGFloat width = CGRectGetWidth(_hotArea);
-            CGFloat shiftLeft = (_showing? width / 2.f :  width);
+            CGFloat shiftLeft = (_isShowing? width / 2.f :  width);
             CGFloat shiftRight = width;
             
             BOOL needProcess = NO;
-            if (_showing)
+            if (_isShowing)
             {
                 if (location.x <= interactiveX + shiftRight)
                 {
@@ -226,9 +243,9 @@
             if (velocityDone && needProcess)
             {
                 _rightViewGestureStartX = [NSNumber numberWithFloat:location.x];
-                _rightViewShowingBeforeGesture = _showing;
+                _rightViewShowingBeforeGesture = _isShowing;
                 
-                if (!_showing)
+                if (!_isShowing)
                 {
                     [self setCurrentRootView:[[UIApplication sharedApplication] keyWindow]];
                     
@@ -278,10 +295,11 @@
                 }
                 else if (percentage == 1.f)
                 {
-                    if (_delegate && [_delegate respondsToSelector:@selector(didShowRightSlideView:)])
-                    {
-                        [_delegate didShowRightSlideView:self];
-                    }
+                    [self didShowRightSlideView];
+                }
+                else
+                {
+                    NSLog(@"FK");
                 }
                 
                 _rightViewGestureStartX = nil;
@@ -303,7 +321,7 @@
     }
     else if (gestureRecognizer == _panGesture)
     {
-        return ([touch.view isEqual:_rootMaskView] || [touch.view isEqual:self]);
+        return YES;
     }
     
     return NO;
@@ -315,23 +333,20 @@
 {
     [self endEditing:YES];
     
-    _showing = YES;
+    _isShowing = YES;
     
     [self resetLayouts];
     [self resetColors];
     [self resetHiddens];
     
-    if (_delegate && [_delegate respondsToSelector:@selector(willShowRightSlideView:)])
-    {
-        [_delegate willShowRightSlideView:self];
-    }
+    [self willShowRightSlideView];
 }
 
 - (void)showRightViewAnimated:(BOOL)animated fromPercentage:(CGFloat)percentage completionHandler:(void(^)())completionHandler
 {
     if (animated)
     {
-        [MVRightSlideView animateStandardWithDuration:_animationSpeed
+        [MVRightSlideView animateStandardWithDuration:_animationDuration
                                            animations:^(void)
          {
              [self layoutViewsWithPercentage:1.f];
@@ -347,10 +362,7 @@
                  completionHandler();
              }
              
-             if (_delegate && [_delegate respondsToSelector:@selector(didShowRightSlideView:)])
-             {
-                 [_delegate didShowRightSlideView:self];
-             }
+             [self didShowRightSlideView];
          }];
     }
     else
@@ -363,30 +375,24 @@
             completionHandler();
         }
         
-        if (_delegate && [_delegate respondsToSelector:@selector(didShowRightSlideView:)])
-        {
-            [_delegate didShowRightSlideView:self];
-        }
+        [self didShowRightSlideView];
     }
 }
 
 - (void)hideRightViewAnimated:(BOOL)animated fromPercentage:(CGFloat)percentage completionHandler:(void(^)())completionHandler
 {
-    if (_delegate && [_delegate respondsToSelector:@selector(willHideRightSlideView:)])
-    {
-        [_delegate willHideRightSlideView:self];
-    }
+    [self willHideRightSlideView];
     
     if (animated)
     {
-        [MVRightSlideView animateStandardWithDuration:_animationSpeed
+        [MVRightSlideView animateStandardWithDuration:_animationDuration
                                            animations:^(void)
          {
              [self layoutViewsWithPercentage:0.f];
          }
                                            completion:^(BOOL finished)
          {
-             _showing = NO;
+             _isShowing = NO;
              
              if (finished)
              {
@@ -397,15 +403,12 @@
                  completionHandler();
              }
              
-             if (_delegate && [_delegate respondsToSelector:@selector(didHideRightSlideView:)])
-             {
-                 [_delegate didHideRightSlideView:self];
-             }
+             [self didHideRightSlideView];
          }];
     }
     else
     {
-        _showing = NO;
+        _isShowing = NO;
 
         [self layoutViewsWithPercentage:0.f];
         
@@ -416,23 +419,19 @@
             completionHandler();
         }
         
-        if (_delegate && [_delegate respondsToSelector:@selector(didHideRightSlideView:)])
-        {
-            [_delegate didHideRightSlideView:self];
-        }
+        [self didHideRightSlideView];
     }
 }
 
 - (void)hideRightViewComleteAfterGesture
 {
-    _showing = NO;
+    _isShowing = NO;
     
-    if (_delegate && [_delegate respondsToSelector:@selector(willHideRightSlideView:)])
-    {
-        [_delegate willHideRightSlideView:self];
-    }
+    [self willHideRightSlideView];
 
     [self showOrHideViewsWithDelay:0.25f];
+    
+    [self didHideRightSlideView];
 }
 
 - (void)layoutViewsWithPercentage:(CGFloat)percentage
@@ -450,7 +449,7 @@
 
 - (void)showOrHideViewsWithDelay:(NSTimeInterval)delay
 {
-    if (!_showing)
+    if (!_isShowing)
     {
         if (delay)
         {
@@ -460,7 +459,7 @@
                                _rightMaskView.hidden = YES;
                                _realRightView.hidden = YES;
                                
-                               [self setCurrentRootView:_userRootView];
+                               [self setCurrentRootView:_rootView];
                            });
         }
         else
@@ -469,7 +468,7 @@
             _rightMaskView.hidden = YES;
             _realRightView.hidden = YES;
             
-            [self setCurrentRootView:_userRootView];
+            [self setCurrentRootView:_rootView];
         }
     }
     else
@@ -486,11 +485,11 @@
     {
         UIWindow *window = [[UIApplication sharedApplication] keyWindow];
         
-        if (currentRootView == _userRootView)
+        if (currentRootView == _rootView)
         {
-            [super setFrame:CGRectMake(0.f, 0.f, CGRectGetWidth(_userRootView.frame), CGRectGetHeight(_userRootView.bounds))];
-            [_userRootView addSubview:self];
-            [_userRootView sendSubviewToBack:self];
+            [super setFrame:_rootView.bounds];
+            [_rootView addSubview:self];
+            [_rootView sendSubviewToBack:self];
             
             if (_currentRootView == window)
             {
@@ -501,7 +500,7 @@
         }
         else if (currentRootView == window)
         {
-            if (_currentRootView == _userRootView)
+            if (_currentRootView == _rootView)
             {
                 _rightViewTop = [self convertPoint:CGPointMake(0.f, _rightViewTop) toView:window].y;
                 
@@ -522,7 +521,7 @@
 
 - (void)resetColors
 {
-    if (_showing)
+    if (_isShowing)
     {
         _rootMaskView.backgroundColor = _maskColor;
         _rightMaskView.backgroundColor = _rightMaskColor;
@@ -558,6 +557,57 @@
     }
 }
 
+- (BOOL)shouldReceiveGestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
+{
+    NSLog(@"shouldReceiveGestureRecognizer");
+    
+    if (_delegate && [_delegate respondsToSelector:@selector(rightSlideView:shouldReceiveGestureRecognizer:)] && ![_delegate rightSlideView:self shouldReceiveGestureRecognizer:gestureRecognizer])
+    {
+        return NO;
+    }
+    
+    return YES;
+}
+
+- (void)willShowRightSlideView
+{
+    NSLog(@"willShowRightSlideView");
+    
+    if (_delegate && [_delegate respondsToSelector:@selector(willShowRightSlideView:)])
+    {
+        [_delegate willShowRightSlideView:self];
+    }
+}
+
+- (void)didShowRightSlideView
+{
+    NSLog(@"didShowRightSlideView");
+    
+    if (_delegate && [_delegate respondsToSelector:@selector(didShowRightSlideView:)])
+    {
+        [_delegate didShowRightSlideView:self];
+    }
+}
+
+- (void)willHideRightSlideView
+{
+    NSLog(@"willHideRightSlideView");
+    
+    if (_delegate && [_delegate respondsToSelector:@selector(willHideRightSlideView:)])
+    {
+        [_delegate willHideRightSlideView:self];
+    }
+}
+
+- (void)didHideRightSlideView
+{
+    NSLog(@"didHideRightSlideView");
+    
+    if (_delegate && [_delegate respondsToSelector:@selector(didHideRightSlideView:)])
+    {
+        [_delegate didHideRightSlideView:self];
+    }
+}
 
 #pragma mark - Protect Old
 

@@ -8,6 +8,7 @@
 
 #import "MVViewController.h"
 #import "MVRightSlideView.h"
+#import "AppDelegate.h"
 
 @interface MVViewController ()
 
@@ -22,19 +23,21 @@
     
     self.view.backgroundColor = [UIColor whiteColor];
     
-    UIButton *bbt = [[UIButton alloc] initWithFrame:CGRectMake(100.f, 200.f, 100.f, 100.f)];
+    UIView *rootView = [[UIView alloc] initWithFrame:self.view.bounds];
+    [self.view addSubview:rootView];
+    
+    UIButton *bbt = [[UIButton alloc] initWithFrame:CGRectMake(320.f, 200.f, 100.f, 100.f)];
     [bbt setTitle:@"ffkk" forState:UIControlStateNormal];
     [bbt setTitleColor:[UIColor blueColor] forState:UIControlStateNormal];
     [bbt addTarget:self action:@selector(ffkkAction) forControlEvents:UIControlEventTouchUpInside];
     bbt.backgroundColor = [UIColor redColor];
-    [self.view addSubview:bbt];
+    [rootView addSubview:bbt];
     
     CGFloat top = 64.f + 20.f;
     CGSize size =  CGSizeMake(CGRectGetWidth(self.view.frame) / 2, CGRectGetHeight(self.view.frame) - 84.f * 2) ;
     
-    _rightSlideView = [[MVRightSlideView alloc] initWithRootView:self.view rightViewTop:top rightViewSize:size];
-    _rightSlideView.animationSpeed = 0.5f;
-    _rightSlideView.hotArea = CGRectMake(CGRectGetWidth(self.view.frame) - 88.f, 84.f, 88.f, CGRectGetHeight(self.view.frame) - 104.f);
+    _rightSlideView = [[MVRightSlideView alloc] initWithRootView:nil rightViewTop:top rightViewSize:size];
+//    _rightSlideView.hotArea = CGRectMake(CGRectGetWidth(self.view.frame) - 88.f, 84.f, 88.f, CGRectGetHeight(self.view.frame) - 104.f);
 //    _rightSlideView.gestureEnabled = YES;
 //    _rightSlideView.gestureDetectTop = top;
 //    _rightSlideView.gestureDetectSize = CGSizeMake(20.f, size.height);

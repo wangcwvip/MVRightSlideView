@@ -13,15 +13,15 @@
 @interface MVRightSlideView : UIView
 
 @property (nonatomic, readonly, strong) UIView *rightView;
-@property (nonatomic, readonly, assign) BOOL showing;
+@property (nonatomic, readonly, assign) BOOL isShowing;
 
 @property (nonatomic, strong) UIColor *maskColor;
 @property (nonatomic, strong) UIColor *rightMaskColor;
-@property (nonatomic, assign) NSTimeInterval animationSpeed;
 
 @property (nonatomic, assign) BOOL enabled;
 @property (nonatomic, assign) BOOL hideWhenTap;
 @property (nonatomic, assign) CGRect hotArea;
+@property (nonatomic, assign) NSTimeInterval animationDuration;
 
 @property (nonatomic, weak) id <MVRightSlideViewDelegate> delegate;
 
