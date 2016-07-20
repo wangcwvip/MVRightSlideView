@@ -23,28 +23,34 @@
     
     self.view.backgroundColor = [UIColor whiteColor];
     
-    UIView *rootView = [[UIView alloc] initWithFrame:self.view.bounds];
-    [self.view addSubview:rootView];
-    
     UIButton *bbt = [[UIButton alloc] initWithFrame:CGRectMake(320.f, 200.f, 100.f, 100.f)];
     [bbt setTitle:@"ffkk" forState:UIControlStateNormal];
     [bbt setTitleColor:[UIColor blueColor] forState:UIControlStateNormal];
     [bbt addTarget:self action:@selector(ffkkAction) forControlEvents:UIControlEventTouchUpInside];
     bbt.backgroundColor = [UIColor redColor];
-    [rootView addSubview:bbt];
+    [self.view addSubview:bbt];
+}
+
+- (void)viewDidAppear:(BOOL)animated
+{
+    [super viewDidAppear:animated];
     
-    CGFloat top = 64.f + 20.f;
-    CGSize size =  CGSizeMake(CGRectGetWidth(self.view.frame) / 2, CGRectGetHeight(self.view.frame) - 84.f * 2) ;
-    
-    _rightSlideView = [[MVRightSlideView alloc] initWithRootView:nil rightViewTop:top rightViewSize:size];
-//    _rightSlideView.hotArea = CGRectMake(CGRectGetWidth(self.view.frame) - 88.f, 84.f, 88.f, CGRectGetHeight(self.view.frame) - 104.f);
-//    _rightSlideView.gestureEnabled = YES;
-//    _rightSlideView.gestureDetectTop = top;
-//    _rightSlideView.gestureDetectSize = CGSizeMake(20.f, size.height);
-    
-    UIView *rightView = [[UIView alloc] initWithFrame:_rightSlideView.rightView.bounds];
-    rightView.backgroundColor = [UIColor redColor];
-    [_rightSlideView.rightView addSubview:rightView];
+    if (_rightSlideView == nil)
+    {
+        CGFloat top = 64.f + 20.f;
+        CGSize size =  CGSizeMake(CGRectGetWidth(self.view.frame) / 2, CGRectGetHeight(self.view.frame) - 84.f * 2) ;
+        
+        _rightSlideView = [[MVRightSlideView alloc] initWithRootView:self.view.superview rightViewTop:top rightViewSize:size];
+//        _rightSlideView.widthForStateChange = 60.f;
+        //    _rightSlideView.hotArea = CGRectMake(CGRectGetWidth(self.view.frame) - 88.f, 84.f, 88.f, CGRectGetHeight(self.view.frame) - 104.f);
+        //    _rightSlideView.gestureEnabled = YES;
+        //    _rightSlideView.gestureDetectTop = top;
+        //    _rightSlideView.gestureDetectSize = CGSizeMake(20.f, size.height);
+        
+        UIView *rightView = [[UIView alloc] initWithFrame:_rightSlideView.rightView.bounds];
+        rightView.backgroundColor = [UIColor redColor];
+        [_rightSlideView.rightView addSubview:rightView];
+    }
 }
 
 - (void)ffkkAction
