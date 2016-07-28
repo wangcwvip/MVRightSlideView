@@ -38,8 +38,9 @@
 @interface MVRightSlideView () <UIGestureRecognizerDelegate>
 
 @property (nonatomic, weak) UIView *userRootView;
-@property (nonatomic, weak) UIView *sysRootView;
+@property (nonatomic, weak) UIView *windowRootView;
 @property (nonatomic, weak) UIView *rootView;
+
 @property (nonatomic, strong) RealRightView *realRightView;
 @property (nonatomic, assign) CGFloat rightViewTop;
 @property (nonatomic, assign) CGSize rightViewSize;
@@ -51,8 +52,6 @@
 
 @property (strong, nonatomic) NSNumber *rightViewGestureStartX;
 @property (assign, nonatomic) BOOL rightViewShowingBeforeGesture;
-@property (nonatomic, assign) BOOL shouldReceiveTapGestureRecognizer;
-@property (nonatomic, assign) BOOL shouldReceivePanGestureRecognizer;
 
 @end
 
@@ -64,7 +63,8 @@
     if (self = [super init])
     {
         _userRootView = rootView;
-        _sysRootView = [[UIApplication sharedApplication] keyWindow];
+        _windowRootView = [[UIApplication sharedApplication] keyWindow];
+        
         _rightViewTop = rightViewTop;
         _rightViewSize = rightViewSize;
         
@@ -78,16 +78,15 @@
 {
     if (_userRootView == nil)
     {
-        _userRootView = _sysRootView;
+        _userRootView = _windowRootView;
     }
     
     _isShowing = NO;
     _hideWhenTap = YES;
+    
     _hotArea = CGRectMake(CGRectGetWidth(_userRootView.frame) - 44.f, 0.f, 44.f, CGRectGetHeight(_userRootView.frame));
-    _slideWidthForChangeState = 0.f;
     _animationDuration = 0.5;
-    _shouldReceivePanGestureRecognizer = YES;
-    _shouldReceiveTapGestureRecognizer = YES;
+    _widthForSlideBack = 0.f;
     
     _maskColor = [UIColor colorWithWhite:0.f alpha:0.5];
     _rightMaskColor = [UIColor colorWithWhite:0.f alpha:0.5];
@@ -96,7 +95,7 @@
     _rootMaskView.backgroundColor = _maskColor;
     _rootMaskView.alpha = 0.f;
     _rootMaskView.hidden = YES;
-    _rootMaskView.frame = _sysRootView.bounds;
+    _rootMaskView.frame = _windowRootView.bounds;
     [self addSubview:_rootMaskView];
     
     _realRightView = [[RealRightView alloc] init];
@@ -119,29 +118,30 @@
     _tapGesture.numberOfTapsRequired = 1;
     _tapGesture.numberOfTouchesRequired = 1;
     _tapGesture.cancelsTouchesInView = NO;
+    [_rootMaskView addGestureRecognizer:_tapGesture];
     
     _panGesture = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panGesture:)];
     _panGesture.delegate = self;
     _panGesture.minimumNumberOfTouches = 1;
     _panGesture.maximumNumberOfTouches = 1;
     _panGesture.cancelsTouchesInView = YES;
+    [_userRootView addGestureRecognizer:_panGesture];
     
-    [self setRootView:_userRootView];
+    [self setUserRootView];
     [self layoutViewsWithPercentage:0.f];
     [self setEnabled:YES];
-}
-
-- (UIView *)rightView
-{
-    return _realRightView;
 }
 
 - (void)setEnabled:(BOOL)enabled
 {
     _enabled = enabled;
+    _tapGesture.enabled = _enabled;
+    _panGesture.enabled = _enabled;
     
-    _tapGesture.enabled = enabled;
-    _panGesture.enabled = enabled;
+    if (!_enabled)
+    {
+        [self hidePercentRightViewAnimated:YES completionHandler:nil];
+    }
 }
 
 - (void)showRightViewAnimated:(BOOL)animated completionHandler:(void(^)())completionHandler
@@ -149,8 +149,7 @@
     if (!_isShowing)
     {
         [self showRightViewPrepare];
-        
-        [self showRightViewAnimated:animated fromPercentage:0.f completionHandler:completionHandler];
+        [self showPercentRightViewAnimated:animated completionHandler:completionHandler];
     }
 }
 
@@ -158,7 +157,7 @@
 {
     if (_isShowing)
     {
-        [self hideRightViewAnimated:animated fromPercentage:1.f completionHandler:completionHandler];
+        [self hidePercentRightViewAnimated:animated completionHandler:completionHandler];
     }
 }
 
@@ -176,81 +175,82 @@
 
 #pragma mark - UIGestureRecognizers
 
+- (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
+{
+    if (gestureRecognizer == _tapGesture)
+    {
+        if (!_hideWhenTap)
+        {
+            return NO;
+        }
+        
+        return YES;
+    }
+    else if (gestureRecognizer == _panGesture)
+    {
+        if (_panGesture.state == UIGestureRecognizerStatePossible || _panGesture.state == UIGestureRecognizerStateBegan || _panGesture.state == UIGestureRecognizerStateChanged)
+        {
+            CGPoint velocity = [_panGesture velocityInView:self];
+            BOOL velocityDone = (_isShowing ? velocity.x > 0.f : velocity.x < 0.f);
+            if (!velocityDone)
+            {
+                return NO;
+            }
+            
+            CGSize size = self.frame.size;
+            CGPoint location = [_panGesture locationInView:self];
+            CGFloat interactiveX = (_isShowing ? size.width - _rightViewSize.width : size.width);
+            
+            CGFloat width = CGRectGetWidth(_hotArea);
+            CGFloat shiftLeft = (_isShowing? width / 2.f :  width);
+            CGFloat shiftRight = width;
+            
+            if (_isShowing)
+            {
+                if ((location.x <= interactiveX + shiftRight) ||
+                    (location.y < CGRectGetMinY(_realRightView.frame) || location.y > CGRectGetMaxY(_realRightView.frame)))
+                {
+                    return YES;
+                }
+            }
+            else if ((location.x >= interactiveX - shiftLeft && location.x <= interactiveX + shiftLeft) &&
+                     (location.y >= CGRectGetMinY(_hotArea) && location.y <= CGRectGetMaxY(_hotArea)))
+            {
+                return YES;
+            }
+            
+            return NO;
+        }
+    }
+    
+    return YES;
+}
+
 - (void)tapGesture:(UITapGestureRecognizer *)gestureRecognizer
 {
-    if (!_hideWhenTap)
-    {
-        return;
-    }
-    
-    _shouldReceiveTapGestureRecognizer = [self shouldReceiveGestureRecognizer:gestureRecognizer];
-    if (!_shouldReceiveTapGestureRecognizer)
-    {
-        return;
-    }
-    
     if (gestureRecognizer.state == UIGestureRecognizerStateEnded)
     {
-        [self hideRightViewAnimated:YES completionHandler:nil];
+        [self hidePercentRightViewAnimated:YES completionHandler:nil];
     }
 }
 
 - (void)panGesture:(UIPanGestureRecognizer *)gestureRecognizer
 {
-    if (gestureRecognizer.state == UIGestureRecognizerStateBegan)
-    {
-        _shouldReceivePanGestureRecognizer = [self shouldReceiveGestureRecognizer:gestureRecognizer];
-    }
-    if (!_shouldReceivePanGestureRecognizer)
-    {
-        return;
-    }
-    
     CGPoint location = [gestureRecognizer locationInView:self];
     CGPoint velocity = [gestureRecognizer velocityInView:self];
     CGSize size = self.frame.size;
 
     if (_realRightView)
     {
-        if (!_rightViewGestureStartX && (gestureRecognizer.state == UIGestureRecognizerStateBegan || gestureRecognizer.state == UIGestureRecognizerStateChanged))
+        if (_rightViewGestureStartX == nil && (gestureRecognizer.state == UIGestureRecognizerStateBegan || gestureRecognizer.state == UIGestureRecognizerStateChanged))
         {
-            _tapGesture.enabled = NO;
+            _rightViewGestureStartX = [NSNumber numberWithFloat:location.x];
+            _rightViewShowingBeforeGesture = _isShowing;
             
-            CGFloat interactiveX = (_isShowing ? size.width - _rightViewSize.width : size.width);
-            BOOL velocityDone = (_isShowing ? velocity.x > 0.f : velocity.x < 0.f);
-            
-            CGFloat width = CGRectGetWidth(_hotArea);
-            CGFloat shiftLeft = (_isShowing? width / 2.f :  width);
-            CGFloat shiftRight = width;
-            
-            BOOL needProcess = NO;
-            if (_isShowing)
+            if (!_isShowing)
             {
-                if (location.x <= interactiveX + shiftRight)
-                {
-                    needProcess = YES;
-                }
-                else if (location.y < CGRectGetMinY(_realRightView.frame) || location.y > CGRectGetMaxY(_realRightView.frame))
-                {
-                    needProcess = YES;
-                }
-            }
-            else if (location.x >= interactiveX - shiftLeft && location.x <= interactiveX + shiftRight && location.y >= CGRectGetMinY(_hotArea) && location.y <= CGRectGetMaxY(_hotArea))
-            {
-                needProcess = YES;
-            }
-            
-            if (velocityDone && needProcess)
-            {
-                _rightViewGestureStartX = [NSNumber numberWithFloat:location.x];
-                _rightViewShowingBeforeGesture = _isShowing;
-                
-                if (!_isShowing)
-                {
-                    [self setRootView:_sysRootView];
-                    
-                    [self showRightViewPrepare];
-                }
+                [self setWindowRootView];
+                [self showRightViewPrepare];
             }
         }
         else if (_rightViewGestureStartX)
@@ -281,14 +281,14 @@
             }
             else if (gestureRecognizer.state == UIGestureRecognizerStateEnded && _rightViewGestureStartX)
             {
-                CGFloat ratio = _slideWidthForChangeState / _rightViewSize.width;
+                CGFloat ratio = _widthForSlideBack / _rightViewSize.width;
                 if ((velocity.x < 0.f && percentage < 1.f && percentage >= ratio) || (velocity.x == 0.f && percentage >= 0.5) || (velocity.x > 0.f && percentage >= 1 - ratio))
                 {
-                    [self showRightViewAnimated:YES fromPercentage:percentage completionHandler:nil];
+                    [self showPercentRightViewAnimated:YES completionHandler:nil];
                 }
                 else if ((velocity.x < 0.f && percentage < ratio) || (velocity.x == 0.f && percentage < 0.5) || (velocity.x > 0.f && percentage < 1 - ratio))
                 {
-                    [self hideRightViewAnimated:YES fromPercentage:percentage completionHandler:nil];
+                    [self hidePercentRightViewAnimated:YES completionHandler:nil];
                 }
                 else if (percentage == 0.f)
                 {
@@ -300,38 +300,16 @@
                 }
                 else
                 {
-                    NSLog(@"FK");
                 }
                 
                 _rightViewGestureStartX = nil;
-                _tapGesture.enabled = YES;
             }
             else
             {
-                _tapGesture.enabled = YES;
                 return;
             }
         }
     }
-}
-
-- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
-{
-    return YES;
-}
-
-- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch
-{
-    if (gestureRecognizer == _tapGesture)
-    {
-        return ([touch.view isEqual:_rootMaskView]);
-    }
-    else if (gestureRecognizer == _panGesture)
-    {
-        return YES;
-    }
-    
-    return NO;
 }
 
 #pragma mark - Show Or Hide
@@ -339,7 +317,7 @@
 - (void)showRightViewPrepare
 {
     _isShowing = YES;
-
+    
     [self endEditing:YES];
     [self layoutViewsWithPercentage:0.f];
     [self showOrHideViewsWithDelay:0];
@@ -347,16 +325,27 @@
     [self willShowRightSlideView];
 }
 
-- (void)showRightViewAnimated:(BOOL)animated fromPercentage:(CGFloat)percentage completionHandler:(void(^)())completionHandler
+- (void)hideRightViewComleteAfterGesture
+{
+    _isShowing = NO;
+    
+    [self willHideRightSlideView];
+
+    [self showOrHideViewsWithDelay:0.25f];
+    
+    [self didHideRightSlideView];
+}
+
+- (void)showPercentRightViewAnimated:(BOOL)animated completionHandler:(void(^)())completionHandler
 {
     if (animated)
     {
-        [MVRightSlideView animateStandardWithDuration:_animationDuration
-                                           animations:^(void)
+        [self animateStandardWithDuration:_animationDuration
+                               animations:^(void)
          {
              [self layoutViewsWithPercentage:1.f];
          }
-                                           completion:^(BOOL finished)
+                               completion:^(BOOL finished)
          {
              if (finished)
              {
@@ -384,18 +373,18 @@
     }
 }
 
-- (void)hideRightViewAnimated:(BOOL)animated fromPercentage:(CGFloat)percentage completionHandler:(void(^)())completionHandler
+- (void)hidePercentRightViewAnimated:(BOOL)animated completionHandler:(void(^)())completionHandler
 {
     [self willHideRightSlideView];
     
     if (animated)
     {
-        [MVRightSlideView animateStandardWithDuration:_animationDuration
-                                           animations:^(void)
+        [self animateStandardWithDuration:_animationDuration
+                               animations:^(void)
          {
              [self layoutViewsWithPercentage:0.f];
          }
-                                           completion:^(BOOL finished)
+                               completion:^(BOOL finished)
          {
              _isShowing = NO;
              
@@ -414,7 +403,7 @@
     else
     {
         _isShowing = NO;
-
+        
         [self layoutViewsWithPercentage:0.f];
         
         [self showOrHideViewsWithDelay:0];
@@ -426,17 +415,6 @@
         
         [self didHideRightSlideView];
     }
-}
-
-- (void)hideRightViewComleteAfterGesture
-{
-    _isShowing = NO;
-    
-    [self willHideRightSlideView];
-
-    [self showOrHideViewsWithDelay:0.25f];
-    
-    [self didHideRightSlideView];
 }
 
 - (void)layoutViewsWithPercentage:(CGFloat)percentage
@@ -464,7 +442,7 @@
                                _rightMaskView.hidden = YES;
                                _realRightView.hidden = YES;
                                
-                               [self setRootView:_userRootView];
+                               [self setUserRootView];
                            });
         }
         else
@@ -473,7 +451,7 @@
             _rightMaskView.hidden = YES;
             _realRightView.hidden = YES;
             
-            [self setRootView:_userRootView];
+            [self setUserRootView];
         }
     }
     else
@@ -485,6 +463,16 @@
     }
 }
 
+- (void)setUserRootView
+{
+    [self setRootView:_userRootView];
+}
+
+- (void)setWindowRootView
+{
+    [self setRootView:_windowRootView];
+}
+
 - (void)setRootView:(UIView *)rootView
 {
     if (_rootView != rootView)
@@ -494,35 +482,31 @@
             [super setFrame:_userRootView.bounds];
             [_userRootView insertSubview:self atIndex:0];
             
-            if (_rootView == _sysRootView)
+            if (_rootView == _windowRootView)
             {
-                _rightViewTop = [_sysRootView convertPoint:CGPointMake(0.f, _rightViewTop) toView:_userRootView].y;
+                _rightViewTop = [_windowRootView convertPoint:CGPointMake(0.f, _rightViewTop) toView:_userRootView].y;
             }
         }
-        else if (rootView == _sysRootView)
+        else if (rootView == _windowRootView)
         {
             if (_rootView == _userRootView)
             {
-                _rightViewTop = [self convertPoint:CGPointMake(0.f, _rightViewTop) toView:_sysRootView].y;
+                _rightViewTop = [self convertPoint:CGPointMake(0.f, _rightViewTop) toView:_windowRootView].y;
                 
-                [super setFrame:_sysRootView.bounds];
-                [_sysRootView addSubview:self];
+                [super setFrame:_windowRootView.bounds];
+                [_windowRootView addSubview:self];
             }
         }
         
         [_rootView removeGestureRecognizer:_panGesture];
-        [_rootView removeGestureRecognizer:_tapGesture];
-        
         _rootView = rootView;
-        
-        [_rootView addGestureRecognizer:_panGesture];;
-        [_rootView addGestureRecognizer:_tapGesture];
+        [_rootView addGestureRecognizer:_panGesture];
     }
 }
 
 #pragma mark - Support
 
-+ (void)animateStandardWithDuration:(NSTimeInterval)duration animations:(void(^)())animations completion:(void(^)(BOOL finished))completion
+- (void)animateStandardWithDuration:(NSTimeInterval)duration animations:(void(^)())animations completion:(void(^)(BOOL finished))completion
 {
     if ([UIDevice currentDevice].systemVersion.floatValue >= 7.0)
     {
@@ -544,21 +528,15 @@
     }
 }
 
-- (BOOL)shouldReceiveGestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
+- (UIView *)rightView
 {
-    NSLog(@"shouldReceiveGestureRecognizer");
-    
-    if (_delegate && [_delegate respondsToSelector:@selector(rightSlideView:shouldReceiveGestureRecognizer:)] && ![_delegate rightSlideView:self shouldReceiveGestureRecognizer:gestureRecognizer])
-    {
-        return NO;
-    }
-    
-    return YES;
+    return _realRightView;
 }
 
 - (void)willShowRightSlideView
 {
     NSLog(@"willShowRightSlideView");
+    _tapGesture.enabled = NO;
     
     if (_delegate && [_delegate respondsToSelector:@selector(willShowRightSlideView:)])
     {
@@ -569,6 +547,7 @@
 - (void)didShowRightSlideView
 {
     NSLog(@"didShowRightSlideView");
+    _tapGesture.enabled = YES;
     
     if (_delegate && [_delegate respondsToSelector:@selector(didShowRightSlideView:)])
     {

@@ -41,6 +41,7 @@
         CGSize size =  CGSizeMake(CGRectGetWidth(self.view.frame) / 2, CGRectGetHeight(self.view.frame) - 84.f * 2) ;
         
         _rightSlideView = [[MVRightSlideView alloc] initWithRootView:self.view.superview rightViewTop:top rightViewSize:size];
+        _rightSlideView.widthForSlideBack = 30.f;
 //        _rightSlideView.widthForStateChange = 60.f;
         //    _rightSlideView.hotArea = CGRectMake(CGRectGetWidth(self.view.frame) - 88.f, 84.f, 88.f, CGRectGetHeight(self.view.frame) - 104.f);
         //    _rightSlideView.gestureEnabled = YES;

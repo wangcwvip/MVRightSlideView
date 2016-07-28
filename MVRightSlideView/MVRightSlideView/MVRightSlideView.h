@@ -21,7 +21,7 @@
 @property (nonatomic, assign) BOOL enabled;
 @property (nonatomic, assign) BOOL hideWhenTap;
 @property (nonatomic, assign) CGRect hotArea;
-@property (nonatomic, assign) CGFloat slideWidthForChangeState;
+@property (nonatomic, assign) CGFloat widthForSlideBack;
 @property (nonatomic, assign) NSTimeInterval animationDuration;
 
 @property (nonatomic, weak) id <MVRightSlideViewDelegate> delegate;
@@ -37,7 +37,6 @@
 @protocol MVRightSlideViewDelegate <NSObject>
 
 @optional
-- (BOOL)rightSlideView:(MVRightSlideView *)rightSlideView shouldReceiveGestureRecognizer:(UIGestureRecognizer *)gestureRecognizer;
 
 - (void)willShowRightSlideView:(MVRightSlideView *)rightSlideView;
 - (void)didShowRightSlideView:(MVRightSlideView *)rightSlideView;
